@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { View, PanResponder, Animated, StyleSheet } from 'react-native';
+import { View, PanResponder, Animated, StyleSheet, TouchableWithoutFeedback, } from 'react-native';
 import Svg from 'react-native-svg';
 const SvgView = Svg;
 import { createIdentityTransform, calcDistance, calcCenter, createScalingMatrix, createTranslationMatrix, viewTransformMult, getBoundedPinchTransform, getBoundedTouchTransform } from './util';
@@ -68,6 +68,7 @@ export default class SvgPanZoom extends Component {
             const distance = calcDistance(x1, y1, x2, y2);
             if (!this.state.isScaling) {
                 this.setState({
+                    isMoving: false,
                     isScaling: true,
                     initialDistance: distance,
                     initialTransform: this.state.viewTransform,
@@ -128,8 +129,9 @@ export default class SvgPanZoom extends Component {
         this.processTouch = (gestureState) => {
             if (!this.state.isMoving) {
                 this.setState({
+                    isScaling: false,
                     isMoving: true,
-                    initialGestureState: { dy: 0, dx: 0 },
+                    initialGestureState: gestureState,
                     initialTransform: this.state.viewTransform,
                 });
                 return;
@@ -179,10 +181,10 @@ export default class SvgPanZoom extends Component {
     componentWillMount() {
         this.state.scaleAnimation.addListener((zoom) => { this.props.onZoom(zoom.value); });
         this.prInstance = PanResponder.create({
-            onStartShouldSetPanResponder: (evt, gestureState) => false,
-            onStartShouldSetPanResponderCapture: (evt, gestureState) => false,
+            onStartShouldSetPanResponder: (evt, gestureState) => true,
+            onStartShouldSetPanResponderCapture: (evt, gestureState) => true,
             onMoveShouldSetPanResponder: (evt, gestureState) => true,
-            onMoveShouldSetPanResponderCapture: (evt, gestureState) => false,
+            onMoveShouldSetPanResponderCapture: (evt, gestureState) => true,
             onPanResponderGrant: (evt, gestureState) => {
                 // Set self for filtering events from other PanResponderTarges
                 if (this.prTargetSelf == null) {
@@ -196,7 +198,6 @@ export default class SvgPanZoom extends Component {
             },
             onPanResponderMove: (evt, gestureState) => {
                 const touches = evt.nativeEvent.touches;
-                // console.log('evt: ' + evt.target + '*************')
                 if (this.dropNextEvt > 0) {
                     this.dropNextEvt--;
                     return;
@@ -214,16 +215,17 @@ export default class SvgPanZoom extends Component {
                 if (touches.length === 2) {
                     this.processPinch(touches[0].pageX, touches[0].pageY, touches[1].pageX, touches[1].pageY);
                 }
-                else if (touches.length === 1 && !this.state.isScaling) {
+                else if (touches.length === 1) {
                     this.processTouch(gestureState);
                 }
             },
-            onPanResponderTerminationRequest: (evt, gestureState) => true,
+            onPanResponderTerminationRequest: (evt, gestureState) => false,
             onPanResponderRelease: (evt, gestureState) => {
                 this.setState({
                     isScaling: false,
                     isMoving: false,
                 });
+                return true;
             },
             onPanResponderTerminate: (evt, gestureState) => { },
         });
@@ -238,20 +240,20 @@ export default class SvgPanZoom extends Component {
             },
             viewStyle
         ])} onLayout={this._onLayout} {...this.prInstance.panHandlers}>
-
-        <Animated.View style={Object.assign({ width: canvasWidth, height: canvasHeight, transform: [
+        <TouchableWithoutFeedback>
+          <Animated.View style={Object.assign({ width: canvasWidth, height: canvasHeight, transform: [
                 { translateX: this.state.TranslationAnimation.x },
                 { translateY: this.state.TranslationAnimation.y },
                 { scale: this.state.scaleAnimation }
             ] }, canvasStyle)}>
-          <SvgView style={{
+            <SvgView style={{
             width: canvasWidth,
             height: canvasHeight,
         }}>
-            {children}
-          </SvgView>
-        </Animated.View>
-
+              {children}
+            </SvgView>
+          </Animated.View>
+        </TouchableWithoutFeedback>
       </View>);
     }
     getInitialViewTransform(canvasWidth, canvasHeight, scale) {
